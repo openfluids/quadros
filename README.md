@@ -11,12 +11,43 @@
 - Extract camera settings from ParaView `.pvsm` state files.
 - Gate NekStab omega-R renders with explicit field aliases and a rebuild hint.
 
-## Install for development
+## Install
+
+### With `uv` (recommended for local development)
 
 ```bash
+git clone https://github.com/ricardofrantz/neksnap.git
+cd neksnap
+uv venv .venv
+. .venv/bin/activate
+uv pip install -e .
+neksnap doctor
+```
+
+For development tools and tests:
+
+```bash
+uv pip install -e . --group dev
+python -m pytest
+```
+
+### With standard `venv` + `pip`
+
+```bash
+git clone https://github.com/ricardofrantz/neksnap.git
+cd neksnap
 python -m venv .venv
 . .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -e .
+neksnap doctor
+```
+
+For development tools and tests:
+
+```bash
+python -m pip install -e . pytest build twine
+python -m pytest
 ```
 
 For a cluster/native rendering setup, see `docs/native-stack.md`.

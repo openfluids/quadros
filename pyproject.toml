@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "neksnap"
+version = "0.1.0"
+description = "Reusable Nek5000 snapshot/frame/video renderer"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Private" }
+authors = [{ name = "Ricardo A S Frantz" }]
+dependencies = [
+  "numpy",
+  "pillow",
+  "pyvista",
+  "pymech",
+  "vtk",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+neksnap = "neksnap.cli:main"

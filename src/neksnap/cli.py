@@ -28,6 +28,36 @@ def doctor(_: argparse.Namespace) -> int:
     }
     for name, ok in checks.items():
         print(f"{name}: {'ok' if ok else 'missing'}")
+
+    # Offscreen rendering smoke: catches broken VTK/OSMesa setups that
+    # importlib.find_spec cannot see (e.g. no display + no software rasteriser).
+    if checks["pyvista"] and checks["vtk"]:
+        import os
+        import tempfile
+        os.environ.setdefault("PYVISTA_OFF_SCREEN", "true")
+        try:
+            import pyvista
+            pyvista.OFF_SCREEN = True
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                tmp_path = tmp.name
+            try:
+                plotter = pyvista.Plotter(off_screen=True, window_size=(64, 64))
+                plotter.add_mesh(pyvista.Sphere())
+                plotter.screenshot(tmp_path)
+                plotter.close()
+                size = os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 0
+                ok = size > 0
+                print(f"offscreen_render: {'ok' if ok else 'failed (empty png)'}")
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+            if not ok:
+                checks["offscreen_render"] = False
+        except Exception as exc:
+            print(f"offscreen_render: failed ({type(exc).__name__}: {exc})")
+            checks["offscreen_render"] = False
     return 0 if all(checks.values()) else 1
 
 

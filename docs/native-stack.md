@@ -2,6 +2,8 @@
 
 `neksnap` packages the Python CLI and renderer, but production rendering still depends on the native visualization stack available on the target machine.
 
+The checked-in Slurm script is currently written for a Jean Zay job. Treat it as a site-specific template, not as a project limitation: `neksnap` can run locally, on other Slurm clusters, or from any scheduler once the native rendering stack is available.
+
 Verify before rendering:
 
 ```bash

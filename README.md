@@ -38,7 +38,7 @@ neksnap extract-camera qp_comp.pvsm --out camera.json
 
 - `src/neksnap/` — importable package and public CLI entrypoint.
 - `configs/` — JSON render config examples compatible with the original workflow.
-- `slurm/render_snapshots.sbatch` — Jean Zay Slurm template.
+- `slurm/render_snapshots.sbatch` — current Slurm template for a Jean Zay job; it is only a starting point and `neksnap` is not limited to Jean Zay.
 - `tests/` — packaging and CLI smoke tests.
 - `docs/` — native-stack notes and operating guidance.
 - `PLAN.md` — source migration plan.

@@ -39,10 +39,12 @@ A Slurm smoke render on `prepost` rendered one frame from:
 /path/to/work/sphere_7/274/sphere0.f00001
 ```
 
-Output directory:
+The temporary smoke directory was deleted after validation.
+
+For future runs, write render outputs *in loco*: under the case directory or a case-local render subdirectory, not in a detached global smoke/output folder. For example:
 
 ```text
-/path/to/work/neksnap-smoke/sphere_7_274_f00001_u/sphere_7_Re_274
+/path/to/work/sphere_7/274/neksnap/sphere0_f00001_u_smoke/
 ```
 
 Expected smoke artifacts:

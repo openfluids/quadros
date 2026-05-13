@@ -1,75 +1,50 @@
 #!/usr/bin/env bash
-#SBATCH -J snp_render
-#SBATCH -A vpo@cpu
-#SBATCH -p prepost
+#SBATCH -J neksnap_render
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=20:00:00
-#SBATCH --output=auto_snp/slurm/%x_%j.out
-#SBATCH --error=auto_snp/slurm/%x_%j.err
+#SBATCH --output=neksnap-slurm/%x_%j.out
+#SBATCH --error=neksnap-slurm/%x_%j.err
+
+# Generic Slurm template for neksnap. Copy this file and add site-specific
+# directives such as account, partition/QoS, modules, or container setup.
+# Example site-specific directives that may be needed on some clusters:
+#   #SBATCH -A <account>
+#   #SBATCH -p <partition>
+#   module purge && module load python/3.11
 
 set -euo pipefail
 
-module purge
-module load python/3.11.5
-
 CASE_DIR="${CASE_DIR:?set CASE_DIR to the Nek case directory}"
-TOOL_DIR="${TOOL_DIR:-"$CASE_DIR/auto_snp"}"
-SNAPSHOT_PATTERN="${SNAPSHOT_PATTERN:-sphere0.f[0-9][0-9][0-9][0-9][0-9]}"
-RENDER_CONFIG="${RENDER_CONFIG:-"$TOOL_DIR/render_scenes_example.json"}"
-FIGURE_DIR="${FIGURE_DIR:-"$TOOL_DIR/figures"}"
-PYVISTA_VENV="${PYVISTA_VENV:-/path/to/work/.venvs/auto_snp-pyvista}"
+SNAPSHOT_PATTERN="${SNAPSHOT_PATTERN:-*.f[0-9][0-9][0-9][0-9][0-9]}"
+RENDER_CONFIG="${RENDER_CONFIG:?set RENDER_CONFIG to a neksnap JSON render config}"
+OUT_DIR="${OUT_DIR:-$PWD/neksnap-output/${SLURM_JOB_ID:-manual}}"
+NEKSNAP_BIN="${NEKSNAP_BIN:-neksnap}"
 
-export PYVISTA_VENV
-export PYVISTA_FIGURE_DIR="$FIGURE_DIR"
-export NEK_RENDER_CONFIG="$RENDER_CONFIG"
-export NEK_OBJECT="${NEK_OBJECT:-sphere}"
-export NEK_SKIP_MISSING_ISO="${NEK_SKIP_MISSING_ISO:-1}"
-export OMP_NUM_THREADS="${OMP_NUM_THREADS:-$SLURM_CPUS_PER_TASK}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-${SLURM_CPUS_PER_TASK:-1}}"
 export PYTHONUNBUFFERED=1
-export PYVISTA_OFF_SCREEN=true
+export PYVISTA_OFF_SCREEN="${PYVISTA_OFF_SCREEN:-true}"
 
-mkdir -p "$TOOL_DIR/slurm" "$FIGURE_DIR"
+mkdir -p "$OUT_DIR" neksnap-slurm
 
-mapfile -t snapshots < <(
-    find "$CASE_DIR" -maxdepth 1 -type f -name "$SNAPSHOT_PATTERN" -printf "%p\n" | sort
-)
-
-if [[ "${#snapshots[@]}" -eq 0 ]]; then
-    echo "error: no snapshots matched $CASE_DIR/$SNAPSHOT_PATTERN" >&2
-    exit 2
-fi
-
-echo "Render job metadata"
+echo "neksnap Slurm render job"
 echo "  date_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "  hostname=$(hostname)"
 echo "  job_id=${SLURM_JOB_ID:-unknown}"
 echo "  case_dir=$CASE_DIR"
-echo "  tool_dir=$TOOL_DIR"
-echo "  render_config=$RENDER_CONFIG"
-echo "  figure_dir=$FIGURE_DIR"
-echo "  pyvista_venv=$PYVISTA_VENV"
 echo "  snapshot_pattern=$SNAPSHOT_PATTERN"
-echo "  snapshot_count=${#snapshots[@]}"
-printf "  snapshots=%s\n" "${snapshots[*]}"
+echo "  render_config=$RENDER_CONFIG"
+echo "  out_dir=$OUT_DIR"
+echo "  neksnap_bin=$NEKSNAP_BIN"
 echo
 
-if [[ ! -x "$TOOL_DIR/render_nek_isosurface_views.sh" ]]; then
-    echo "error: missing executable $TOOL_DIR/render_nek_isosurface_views.sh" >&2
-    exit 2
-fi
+"$NEKSNAP_BIN" doctor
+"$NEKSNAP_BIN" render-many \
+  --case-dir "$CASE_DIR" \
+  --pattern "$SNAPSHOT_PATTERN" \
+  --config "$RENDER_CONFIG" \
+  --out "$OUT_DIR" \
+  ${NEKSNAP_RENDER_CHECK:+--check}
 
-if [[ ! -x "$PYVISTA_VENV/bin/python" ]]; then
-    echo "error: missing $PYVISTA_VENV/bin/python; run install_pyvista.sh first" >&2
-    exit 2
-fi
-
-for snapshot in "${snapshots[@]}"; do
-    echo "START snapshot $(basename "$snapshot") at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    /usr/bin/time -v "$TOOL_DIR/render_nek_isosurface_views.sh" "$snapshot"
-    echo "DONE  snapshot $(basename "$snapshot") at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo
-done
-
-echo "Render job finished at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "neksnap Slurm render finished at $(date -u +%Y-%m-%dT%H:%M:%SZ)"

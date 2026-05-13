@@ -1,6 +1,6 @@
 # neksnap
 
-`neksnap` is a private Python CLI package for rendering Nek5000 snapshots into checked frame sets and videos. It extracts the reusable `auto_snp` workflow from `myproject` into an installable package that can run locally or from a Slurm job without copying scripts into case directories.
+`neksnap` is a private Python CLI package for rendering Nek5000 snapshots into checked frame sets and videos. It extracts the reusable `auto_snp` workflow from `myproject` into an installable package that can run locally, over SSH, inside containers, or from scheduler jobs without copying scripts into case directories.
 
 ## Features
 
@@ -38,7 +38,7 @@ neksnap extract-camera qp_comp.pvsm --out camera.json
 
 - `src/neksnap/` — importable package and public CLI entrypoint.
 - `configs/` — JSON render config examples compatible with the original workflow.
-- `slurm/render_snapshots.sbatch` — current Slurm template for a Jean Zay job; it is only a starting point and `neksnap` is not limited to Jean Zay.
+- `slurm/render_snapshots.sbatch` — generic Slurm starter template; copy it and add cluster-specific account, partition, module, or container directives as needed.
 - `tests/` — packaging and CLI smoke tests.
 - `docs/` — native-stack notes and operating guidance.
 - `PLAN.md` — source migration plan.

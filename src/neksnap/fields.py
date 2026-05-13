@@ -28,12 +28,7 @@ def expected_field_aliases(config: Path | None) -> dict[str, str]:
     return aliases if isinstance(aliases, dict) else {}
 
 
-def available_field_codes(snapshot: Path) -> dict[str, int]:
-    """Return {alias_lowercase: count} for fields actually present in the
-    snapshot binary header. Recognised aliases: mesh, velocity, pressure,
-    temperature, s01, s02, ... (count >= 1 means present).
-    """
-    header = read_header(snapshot)
+def _decode_header(header) -> dict[str, int]:
     var_str = header.variables.upper()
     nb_vars = header.nb_vars
     out: dict[str, int] = {}
@@ -49,6 +44,14 @@ def available_field_codes(snapshot: Path) -> dict[str, int]:
     for i in range(1, n_scalars + 1):
         out[f"s{i:02d}"] = 1
     return out
+
+
+def available_field_codes(snapshot: Path) -> dict[str, int]:
+    """Return {alias_lowercase: count} for fields actually present in the
+    snapshot binary header. Recognised aliases: mesh, velocity, pressure,
+    temperature, s01, s02, ... (count >= 1 means present).
+    """
+    return _decode_header(read_header(snapshot))
 
 
 def _omega_alias_targets(aliases: dict[str, str]) -> Iterator[tuple[str, str]]:
@@ -70,11 +73,11 @@ def assert_expected_fields(snapshot: Path, config: Path | None) -> None:
     needed = list(_omega_alias_targets(aliases))
     if not needed:
         return
-    available = available_field_codes(snapshot)
+    header = read_header(snapshot)
+    available = _decode_header(header)
     missing = [(key, target) for key, target in needed if available.get(target.lower(), 0) <= 0]
     if missing:
         details = ", ".join(f"{k} -> {t!r}" for k, t in missing)
-        header = read_header(snapshot)
         raise RuntimeError(
             f"{snapshot}: configured omega-R field aliases not in header: {details}. "
             "Rebuild the NekStab case with ifvox = .true. and mks <CASE>, then rerun. "

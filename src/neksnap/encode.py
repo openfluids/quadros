@@ -12,10 +12,10 @@ def _resolve_ffmpeg() -> str:
     """
     try:
         from imageio_ffmpeg import get_ffmpeg_exe
-
-        return get_ffmpeg_exe()
-    except Exception:
+    except ImportError:
         pass
+    else:
+        return get_ffmpeg_exe()
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg:
         return ffmpeg

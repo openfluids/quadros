@@ -56,12 +56,14 @@ For a cluster/native rendering setup, see `docs/native-stack.md`.
 
 ```bash
 neksnap doctor
-neksnap render snapshot.f00001 --config configs/render_scenes_example.json --out frames/
-neksnap render-many --case-dir /path/to/case --pattern 'sphere0.f*' --config render.json --out frames/
+neksnap render snapshot.f00001 --config configs/render_scenes_example.json
+neksnap render-many --case-dir /path/to/case --pattern 'sphere0.f*' --config render.json
 neksnap inspect manifest.json
 neksnap encode --frames frames/ --out movies/movie.mp4
 neksnap extract-camera qp_comp.pvsm --out camera.json
 ```
+
+By default, render outputs are written in loco under `SNAPSHOT_PARENT/neksnap` for `render` and `CASE_DIR/neksnap` for `render-many`. Use `--out` only when you intentionally want a different output root.
 
 `--check` enables an omega-R preflight gate for configs that declare `field_aliases` for `omR*`/omega fields. If the configured payload is absent, the command points the operator to rebuild the NekStab case with `ifvox = .true.` and `mks <CASE>`.
 

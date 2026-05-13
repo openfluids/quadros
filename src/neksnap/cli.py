@@ -3,13 +3,20 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import shutil
-import sys
 from pathlib import Path
 
 from .encode import encode_frames
 from .manifests import inspect_manifest
 from .paraview import extract_camera
 from .render import render_snapshots
+
+
+def default_output_dir_for_snapshot(snapshot: Path) -> Path:
+    return snapshot.parent / "neksnap"
+
+
+def default_output_dir_for_case(case_dir: Path) -> Path:
+    return case_dir / "neksnap"
 
 
 def doctor(_: argparse.Namespace) -> int:
@@ -25,12 +32,14 @@ def doctor(_: argparse.Namespace) -> int:
 
 
 def cmd_render(args: argparse.Namespace) -> int:
-    return render_snapshots([args.snapshot], args.config, args.out, check=args.check)
+    out = args.out or default_output_dir_for_snapshot(args.snapshot)
+    return render_snapshots([args.snapshot], args.config, out, check=args.check)
 
 
 def cmd_render_many(args: argparse.Namespace) -> int:
     snapshots = sorted(args.case_dir.glob(args.pattern))
-    return render_snapshots(snapshots, args.config, args.out, check=args.check)
+    out = args.out or default_output_dir_for_case(args.case_dir)
+    return render_snapshots(snapshots, args.config, out, check=args.check)
 
 
 def cmd_inspect(args: argparse.Namespace) -> int:
@@ -57,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("render", help="render one Nek snapshot")
     p.add_argument("snapshot", type=Path)
     p.add_argument("--config", type=Path)
-    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--out", type=Path, help="output root; defaults to SNAPSHOT_PARENT/neksnap")
     p.add_argument("--check", action="store_true", help="preflight configured field aliases before rendering")
     p.set_defaults(func=cmd_render)
 
@@ -65,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--case-dir", type=Path, required=True)
     p.add_argument("--pattern", required=True)
     p.add_argument("--config", type=Path)
-    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--out", type=Path, help="output root; defaults to CASE_DIR/neksnap")
     p.add_argument("--check", action="store_true", help="preflight configured field aliases before rendering")
     p.set_defaults(func=cmd_render_many)
 

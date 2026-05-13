@@ -41,10 +41,10 @@ A Slurm smoke render on `prepost` rendered one frame from:
 
 The temporary smoke directory was deleted after validation.
 
-For future runs, write render outputs *in loco*: under the case directory or a case-local render subdirectory, not in a detached global smoke/output folder. For example:
+For future runs, write render outputs *in loco*. This is now the default: `neksnap render-many --case-dir /path/to/case ...` writes to `/path/to/case/neksnap` unless `--out` is explicitly provided. Do not use detached global smoke/output folders. Example output root:
 
 ```text
-/path/to/work/sphere_7/274/neksnap/sphere0_f00001_u_smoke/
+/path/to/work/sphere_7/274/neksnap/
 ```
 
 Expected smoke artifacts:

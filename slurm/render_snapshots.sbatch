@@ -19,14 +19,14 @@ set -euo pipefail
 CASE_DIR="${CASE_DIR:?set CASE_DIR to the Nek case directory}"
 SNAPSHOT_PATTERN="${SNAPSHOT_PATTERN:-*.f[0-9][0-9][0-9][0-9][0-9]}"
 RENDER_CONFIG="${RENDER_CONFIG:?set RENDER_CONFIG to a neksnap JSON render config}"
-OUT_DIR="${OUT_DIR:-$PWD/neksnap-output/${SLURM_JOB_ID:-manual}}"
+OUT_DIR="${OUT_DIR:-$CASE_DIR/neksnap}"
 NEKSNAP_BIN="${NEKSNAP_BIN:-neksnap}"
 
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-${SLURM_CPUS_PER_TASK:-1}}"
 export PYTHONUNBUFFERED=1
 export PYVISTA_OFF_SCREEN="${PYVISTA_OFF_SCREEN:-true}"
 
-mkdir -p "$OUT_DIR" neksnap-slurm
+mkdir -p "$OUT_DIR" "$OUT_DIR/slurm"
 
 echo "neksnap Slurm render job"
 echo "  date_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

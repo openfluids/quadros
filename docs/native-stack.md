@@ -2,7 +2,7 @@
 
 `neksnap` packages the Python CLI and renderer, but production rendering still depends on the native visualization stack available on the target machine.
 
-`neksnap` is not tied to Jean Zay or to Slurm. It can run locally, over SSH on a workstation, inside a container, on any Slurm cluster, or from another scheduler once the native rendering stack is available. The checked-in Slurm script is only a generic starter template; cluster-specific accounts, partitions, modules, and containers belong in local copies.
+`neksnap` is not tied to Jean Zay or to Slurm. It can run locally, over SSH on a workstation, inside a container, on any Slurm cluster, or from another scheduler once the native rendering stack is available. The checked-in Slurm script is only a generic starter template; cluster-specific accounts, partitions, modules, and containers belong in local copies. Render outputs default to the case-local `neksnap/` directory.
 
 Verify before rendering:
 

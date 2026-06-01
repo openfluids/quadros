@@ -101,6 +101,11 @@ BODY_AMBIENT = float(os.environ.get("NEK_BODY_AMBIENT", "0.40"))
 BODY_DIFFUSE = float(os.environ.get("NEK_BODY_DIFFUSE", "0.70"))
 BODY_SPECULAR = float(os.environ.get("NEK_BODY_SPECULAR", "0.08"))
 BODY_SPECULAR_POWER = float(os.environ.get("NEK_BODY_SPECULAR_POWER", "16"))
+# Optional wake-axis centerline at y=0, z=0. NEK_CENTERLINE="x0,x1" enables it
+# (line from (x0,0,0) to (x1,0,0)); empty string = off.
+CENTERLINE = os.environ.get("NEK_CENTERLINE", "")
+CENTERLINE_COLOR = os.environ.get("NEK_CENTERLINE_COLOR", "#E04040")
+CENTERLINE_WIDTH = float(os.environ.get("NEK_CENTERLINE_WIDTH", "2"))
 RENDER_CONFIG = os.environ.get("NEK_RENDER_CONFIG", "")
 LOG_LEVEL = os.environ.get("NEK_LOG_LEVEL", "info").lower()
 
@@ -1475,6 +1480,14 @@ def render_view(
                 specular=BODY_SPECULAR,
                 specular_power=BODY_SPECULAR_POWER,
             )
+            if CENTERLINE:
+                _cx0, _cx1 = (float(v) for v in CENTERLINE.split(","))
+                plotter.add_mesh(
+                    pv.Line((_cx0, 0.0, 0.0), (_cx1, 0.0, 0.0)),
+                    color=CENTERLINE_COLOR,
+                    line_width=CENTERLINE_WIDTH,
+                    lighting=False,
+                )
             plotter.add_text(
                 (
                     f"{case.field_path.name}: t={snapshot_time:.6g}, step={snapshot_istep}\n"

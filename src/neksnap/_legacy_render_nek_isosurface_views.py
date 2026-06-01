@@ -106,6 +106,18 @@ BODY_SPECULAR_POWER = float(os.environ.get("NEK_BODY_SPECULAR_POWER", "16"))
 CENTERLINE = os.environ.get("NEK_CENTERLINE", "")
 CENTERLINE_COLOR = os.environ.get("NEK_CENTERLINE_COLOR", "#E04040")
 CENTERLINE_WIDTH = float(os.environ.get("NEK_CENTERLINE_WIDTH", "2"))
+
+# Bake the in-render text overlay? Set NEK_ANNOTATION=off to render clean
+# frames (time/labels then added crisply in post via ffmpeg drawtext, which
+# avoids the per-frame VTK text flicker and repeated headers in composites).
+ANNOTATION = env_bool("NEK_ANNOTATION", True)
+# Depth peeling: correct order-independent transparency for semi-transparent
+# isosurfaces (opacity < 1). Without it, overlapping transparent layers
+# composite in the wrong order and look muddy. NEK_DEPTH_PEELING=on to enable.
+DEPTH_PEELING = env_bool("NEK_DEPTH_PEELING", False)
+DEPTH_PEELS = int(os.environ.get("NEK_DEPTH_PEELS", "8"))
+# Screen-space ambient occlusion adds contact shadows / depth cues.
+SSAO = env_bool("NEK_SSAO", False)
 RENDER_CONFIG = os.environ.get("NEK_RENDER_CONFIG", "")
 LOG_LEVEL = os.environ.get("NEK_LOG_LEVEL", "info").lower()
 
@@ -1454,6 +1466,18 @@ def render_view(
                 if ANTI_ALIASING == "msaa":
                     anti_aliasing_kwargs["multi_samples"] = ANTI_ALIASING_SAMPLES
                 plotter.enable_anti_aliasing(ANTI_ALIASING, **anti_aliasing_kwargs)
+            if DEPTH_PEELING:
+                try:
+                    plotter.enable_depth_peeling(
+                        number_of_peels=DEPTH_PEELS, occlusion_ratio=0.0
+                    )
+                except Exception:
+                    pass
+            if SSAO:
+                try:
+                    plotter.enable_ssao()
+                except Exception:
+                    pass
             for spec, surface in layers:
                 plotter.add_mesh(
                     surface,
@@ -1488,15 +1512,16 @@ def render_view(
                     line_width=CENTERLINE_WIDTH,
                     lighting=False,
                 )
-            plotter.add_text(
-                (
-                    f"{case.field_path.name}: t={snapshot_time:.6g}, step={snapshot_istep}\n"
-                    f"{scene.name}: {title_label}, {view_label}"
-                ),
-                position="upper_left",
-                font_size=12,
-                color="black",
-            )
+            if ANNOTATION:
+                plotter.add_text(
+                    (
+                        f"{case.field_path.name}: t={snapshot_time:.6g}, step={snapshot_istep}\n"
+                        f"{scene.name}: {title_label}, {view_label}"
+                    ),
+                    position="upper_left",
+                    font_size=12,
+                    color="black",
+                )
             if scene.show_bounds:
                 plotter.show_bounds(
                     grid="front",

@@ -96,6 +96,9 @@ SURFACE_SMOOTH_FEATURE_ANGLE = float(os.environ.get("NEK_SURFACE_SMOOTH_FEATURE_
 SURFACE_SMOOTH_BOUNDARY = env_bool("NEK_SURFACE_SMOOTH_BOUNDARY", True)
 SURFACE_SMOOTH_FEATURE = env_bool("NEK_SURFACE_SMOOTH_FEATURE", False)
 BODY_COLOR = os.environ.get("NEK_BODY_COLOR", "#8A8A8A")
+# Render background. Transparent contours read far better against a dark bg
+# (luminous edges) than washing into white. NEK_BACKGROUND="#0d0d0d" for dark.
+BACKGROUND = os.environ.get("NEK_BACKGROUND", "white")
 BODY_LIGHTING = env_bool("NEK_BODY_LIGHTING", True)
 BODY_AMBIENT = float(os.environ.get("NEK_BODY_AMBIENT", "0.40"))
 BODY_DIFFUSE = float(os.environ.get("NEK_BODY_DIFFUSE", "0.70"))
@@ -1475,7 +1478,7 @@ def render_view(
                 border=False,
                 window_size=(render_resolution.width, render_resolution.height),
             )
-            plotter.set_background("white")
+            plotter.set_background(BACKGROUND)
             if ANTI_ALIASING not in {"", "0", "false", "none"}:
                 anti_aliasing_kwargs = {}
                 if ANTI_ALIASING == "msaa":

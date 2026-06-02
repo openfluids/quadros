@@ -118,6 +118,13 @@ DEPTH_PEELING = env_bool("NEK_DEPTH_PEELING", False)
 DEPTH_PEELS = int(os.environ.get("NEK_DEPTH_PEELS", "8"))
 # Screen-space ambient occlusion adds contact shadows / depth cues.
 SSAO = env_bool("NEK_SSAO", False)
+# Physically-based rendering: metallic/roughness material + image-based lighting
+# from an HDRI environment map -> glossy reflections without a ray tracer (no GPU).
+# NEK_ISO_PBR=on + NEK_ENVIRONMENT=/path/to/equirectangular.(hdr|png) for reflections.
+ISO_PBR = env_bool("NEK_ISO_PBR", False)
+ISO_METALLIC = float(os.environ.get("NEK_ISO_METALLIC", "0.40"))
+ISO_ROUGHNESS = float(os.environ.get("NEK_ISO_ROUGHNESS", "0.35"))
+ENVIRONMENT_TEXTURE = os.environ.get("NEK_ENVIRONMENT", "")
 RENDER_CONFIG = os.environ.get("NEK_RENDER_CONFIG", "")
 LOG_LEVEL = os.environ.get("NEK_LOG_LEVEL", "info").lower()
 
@@ -1478,6 +1485,15 @@ def render_view(
                     plotter.enable_ssao()
                 except Exception:
                     pass
+            if ENVIRONMENT_TEXTURE:
+                try:
+                    plotter.set_environment_texture(pv.read_texture(ENVIRONMENT_TEXTURE))
+                except Exception:
+                    pass
+            iso_pbr_kwargs = (
+                dict(pbr=True, metallic=ISO_METALLIC, roughness=ISO_ROUGHNESS)
+                if ISO_PBR else {}
+            )
             for spec, surface in layers:
                 plotter.add_mesh(
                     surface,
@@ -1490,6 +1506,7 @@ def render_view(
                     diffuse=ISO_DIFFUSE,
                     specular=ISO_SPECULAR,
                     specular_power=ISO_SPECULAR_POWER,
+                    **iso_pbr_kwargs,
                 )
             plotter.add_mesh(
                 body,

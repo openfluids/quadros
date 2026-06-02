@@ -125,6 +125,14 @@ ISO_PBR = env_bool("NEK_ISO_PBR", False)
 ISO_METALLIC = float(os.environ.get("NEK_ISO_METALLIC", "0.40"))
 ISO_ROUGHNESS = float(os.environ.get("NEK_ISO_ROUGHNESS", "0.35"))
 ENVIRONMENT_TEXTURE = os.environ.get("NEK_ENVIRONMENT", "")
+# Camera-relative key/fill/rim light rig (ParaView-style) -- the reliable,
+# offscreen-safe way to make TRANSPARENT contours read as 3D form. The rim
+# (back) light glows the silhouette/edges of the vortex structures. Intensities
+# are tunable; lights follow the camera so all views are lit consistently.
+LIGHT_RIG = env_bool("NEK_LIGHT_RIG", False)
+LIGHT_KEY = float(os.environ.get("NEK_LIGHT_KEY", "0.95"))
+LIGHT_FILL = float(os.environ.get("NEK_LIGHT_FILL", "0.40"))
+LIGHT_RIM = float(os.environ.get("NEK_LIGHT_RIM", "0.75"))
 RENDER_CONFIG = os.environ.get("NEK_RENDER_CONFIG", "")
 LOG_LEVEL = os.environ.get("NEK_LOG_LEVEL", "info").lower()
 
@@ -1488,6 +1496,18 @@ def render_view(
             if ENVIRONMENT_TEXTURE:
                 try:
                     plotter.set_environment_texture(pv.read_texture(ENVIRONMENT_TEXTURE))
+                except Exception:
+                    pass
+            if LIGHT_RIG:
+                try:
+                    plotter.remove_all_lights()
+                    # positions are directions in camera space for 'camera light'
+                    plotter.add_light(pv.Light(position=(0.4, 0.5, 1.0),
+                        light_type="camera light", intensity=LIGHT_KEY))   # key, upper-right-front
+                    plotter.add_light(pv.Light(position=(-0.6, -0.2, 0.6),
+                        light_type="camera light", intensity=LIGHT_FILL))  # fill, lower-left
+                    plotter.add_light(pv.Light(position=(0.0, 0.3, -1.0),
+                        light_type="camera light", intensity=LIGHT_RIM))   # rim/back -> edge glow
                 except Exception:
                     pass
             iso_pbr_kwargs = (

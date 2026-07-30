@@ -295,6 +295,47 @@ def test_doctor_runs_and_reports_every_check(capsys) -> None:
         assert check in out, f"doctor did not report {check}"
 
 
+def test_doctor_accepts_the_ffmpeg_the_encoder_would_actually_use(monkeypatch, capsys) -> None:
+    """doctor must agree with encode.py about what counts as having ffmpeg.
+
+    encode._resolve_ffmpeg() prefers the binary shipped inside imageio_ffmpeg
+    and only then falls back to PATH, so a venv with imageio-ffmpeg installed
+    can encode perfectly well with no system ffmpeg. doctor checked
+    shutil.which("ffmpeg") alone, so that setup was told it was broken and
+    doctor exited 1 — the same false alarm the pymech check is explicitly
+    written to avoid.
+    """
+    import argparse
+
+    from quadros import cli, encode
+
+    # No PATH ffmpeg is simulated by patching the resolver itself: doctor now
+    # asks the encoder, so PATH is not part of the contract under test.
+    monkeypatch.setattr(encode, "_resolve_ffmpeg", lambda: "/venv/lib/imageio_ffmpeg/ffmpeg")
+
+    rc = cli.doctor(argparse.Namespace())
+    out = capsys.readouterr().out
+    assert "ffmpeg: ok" in out, out
+    assert rc == 0
+
+
+def test_doctor_reports_ffmpeg_missing_when_nothing_can_supply_it(monkeypatch, capsys) -> None:
+    """With neither a bundled nor a PATH ffmpeg, doctor must still fail."""
+    import argparse
+
+    from quadros import cli, encode
+
+    def _no_ffmpeg() -> str:
+        raise RuntimeError("no ffmpeg found")
+
+    monkeypatch.setattr(encode, "_resolve_ffmpeg", _no_ffmpeg)
+
+    rc = cli.doctor(argparse.Namespace())
+    out = capsys.readouterr().out
+    assert "ffmpeg: missing" in out, out
+    assert rc == 1
+
+
 def test_has_pymech_reports_false_when_absent(monkeypatch) -> None:
     """The probe must answer False rather than raise when pymech is missing."""
     import importlib.util

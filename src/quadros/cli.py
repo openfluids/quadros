@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import shutil
 from pathlib import Path
 
 from .encode import encode_frames
@@ -32,11 +31,27 @@ def _has_pymech() -> bool:
         return False
 
 
+def _has_ffmpeg() -> bool:
+    """Report ffmpeg exactly as `encode` resolves it, not as PATH sees it.
+
+    encode._resolve_ffmpeg() prefers the static binary inside `imageio_ffmpeg`
+    and only falls back to PATH, so `shutil.which("ffmpeg")` alone would call a
+    perfectly working venv broken. Same reasoning as the pymech note below:
+    doctor must not report failure for a setup that renders and encodes fine.
+    """
+    from . import encode
+
+    try:
+        return bool(encode._resolve_ffmpeg())
+    except (RuntimeError, ImportError, OSError):
+        return False
+
+
 def doctor(_: argparse.Namespace) -> int:
     checks = {
         "pyvista": importlib.util.find_spec("pyvista") is not None,
         "vtk": importlib.util.find_spec("vtk") is not None,
-        "ffmpeg": shutil.which("ffmpeg") is not None,
+        "ffmpeg": _has_ffmpeg(),
     }
     # pymech is the `nek5000` extra, not a requirement. Reported so the state is
     # visible, but deliberately excluded from the exit status: an install without

@@ -1,3 +1,5 @@
+![quadros banner](https://raw.githubusercontent.com/openfluids/quadros/main/assets/readme-banner-v1.jpg)
+
 # quadros
 
 `quadros` is a Python CLI package for rendering snapshots into checked frame sets and videos. It can run locally, over SSH, inside containers, or from scheduler jobs without copying scripts into case directories. Nek5000 is the format with dedicated support; other VTK-readable formats are supported via PyVista.

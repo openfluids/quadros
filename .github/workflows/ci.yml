@@ -64,7 +64,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            libgl1 libglx-mesa0 libxrender1 libxext6 xvfb
+            libgl1 libglx-mesa0 libxrender1 libxext6 xvfb \
+            libgl1-mesa-dri libglu1-mesa
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -80,9 +81,14 @@ jobs:
       - name: Sync environment
         run: uv sync --python ${{ matrix.python-version }}
 
+      # xvfb-run, not a bare invocation: doctor's render smoke test asks VTK for
+      # a real GL context. The runner has no display and no GPU, so without a
+      # virtual X server plus the Mesa software rasteriser the call segfaults
+      # (exit 139) rather than failing with a message. xvfb was already being
+      # installed here but never used.
       - name: Run tests
         run: |
-          uv run pytest -v | tee pytest-output.txt
+          xvfb-run -a uv run pytest -v | tee pytest-output.txt
           {
             echo "### Tests (Python ${{ matrix.python-version }}, no nek5000 extra)"
             echo '```'
@@ -97,7 +103,7 @@ jobs:
       # the optional Nek extra is absent.
       - name: doctor runs and does not fail over an optional extra
         run: |
-          uv run python -m quadros doctor | tee doctor.txt
+          xvfb-run -a uv run python -m quadros doctor | tee doctor.txt
           grep -q "pyvista: ok" doctor.txt
           grep -q "vtk: ok" doctor.txt
           grep -q "pymech" doctor.txt
@@ -114,7 +120,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            libgl1 libglx-mesa0 libxrender1 libxext6 xvfb
+            libgl1 libglx-mesa0 libxrender1 libxext6 xvfb \
+            libgl1-mesa-dri libglu1-mesa
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -145,11 +152,11 @@ jobs:
         shell: bash
 
       - name: Run tests
-        run: uv run --no-sync pytest -v
+        run: xvfb-run -a uv run --no-sync pytest -v
 
       - name: doctor reports the extra as present
         run: |
-          uv run --no-sync python -m quadros doctor | tee doctor.txt
+          xvfb-run -a uv run --no-sync python -m quadros doctor | tee doctor.txt
           grep -q "pymech (nek5000 extra): ok" doctor.txt
         shell: bash
 

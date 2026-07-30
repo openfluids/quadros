@@ -1,5 +1,7 @@
 import os
+
 from PIL import Image
+
 
 def crop_transparent_areas(folder_path, output_folder):
     if not os.path.exists(output_folder):
@@ -13,11 +15,11 @@ def crop_transparent_areas(folder_path, output_folder):
                     # Ensure image has an alpha channel
                     if img.mode != "RGBA":
                         img = img.convert("RGBA")
-                    
+
                     # Get bounding box of non-transparent areas
                     alpha = img.split()[-1]  # Get the alpha channel
                     bbox = alpha.getbbox()
-                    
+
                     if bbox:
                         cropped_img = img.crop(bbox)
 

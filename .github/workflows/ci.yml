@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Read-only token: nothing here pushes, comments or publishes.
+permissions:
+  contents: read
+
+# Actions are pinned to commit SHAs, not tags. A tag is mutable and can be
+# repointed at new code under an unchanged name; a SHA cannot. Dependabot keeps
+# the pins current, and the trailing comment keeps them readable.
+
+env:
+  # VTK on a runner has no display. PyVista must be told before first import,
+  # or Plotter construction tries to open a window and dies.
+  PYVISTA_OFF_SCREEN: "true"
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync environment
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check .
+
+      # uv.lock must stay consistent with pyproject.toml, or `uv sync` in the
+      # other jobs silently installs something the manifest no longer asks for.
+      - name: Lock file is in sync
+        run: uv lock --check
+
+  # The default install has no pymech. That is the normal case for anyone
+  # rendering a non-Nek format, and the Nek code path must degrade to a clear
+  # message rather than raising. Running the suite without the extra is what
+  # keeps that true.
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # VTK links against system GL and X libraries even when rendering
+      # offscreen. Without these, `import vtk` succeeds and the first Plotter
+      # fails, which is a confusing place to discover a missing .so.
+      - name: Install headless rendering libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 libglx-mesa0 libxrender1 libxext6 xvfb
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: pip install uv
+
+      # numpy dropped cp311 wheels at 2.5, so the 3.11 leg resolves to an older
+      # numpy than the rest of the matrix. That is expected, and is precisely
+      # why this leg exists rather than being assumed to work.
+      - name: Sync environment
+        run: uv sync --python ${{ matrix.python-version }}
+
+      - name: Run tests
+        run: |
+          uv run pytest -v | tee pytest-output.txt
+          {
+            echo "### Tests (Python ${{ matrix.python-version }}, no nek5000 extra)"
+            echo '```'
+            tail -n 15 pytest-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+      # A hard gate, not a print. doctor once shipped calling a function that
+      # did not exist and died with NameError on every invocation; no test
+      # covered it. It must run, and it must not report failure merely because
+      # the optional Nek extra is absent.
+      - name: doctor runs and does not fail over an optional extra
+        run: |
+          uv run python -m quadros doctor | tee doctor.txt
+          grep -q "pyvista: ok" doctor.txt
+          grep -q "vtk: ok" doctor.txt
+          grep -q "pymech" doctor.txt
+        shell: bash
+
+  # The other half: with pymech installed, the Nek header reader must actually
+  # work. Without this job the dedicated Nek path is never exercised at all.
+  test-nek5000:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install headless rendering libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libgl1 libglx-mesa0 libxrender1 libxext6 xvfb
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Sync environment with the Nek5000 extra
+        run: uv sync --extra nek5000
+
+      # A silent install failure would remove exactly the coverage this job
+      # exists to add, and the suite would still pass. Assert rather than hope.
+      - name: Require pymech to actually be importable
+        run: |
+          uv run --no-sync python - <<'PY'
+          import importlib.util
+          import sys
+
+          if importlib.util.find_spec("pymech.neksuite.field") is None:
+              sys.exit(
+                  "FAIL: the nek5000 extra did not install pymech.neksuite.field.\n"
+                  "This job exists so the Nek5000 code path is exercised; without "
+                  "pymech it silently tests the same thing as the matrix above."
+              )
+          print("ok: pymech.neksuite.field importable")
+          PY
+        shell: bash
+
+      - name: Run tests
+        run: uv run --no-sync pytest -v
+
+      - name: doctor reports the extra as present
+        run: |
+          uv run --no-sync python -m quadros doctor | tee doctor.txt
+          grep -q "pymech (nek5000 extra): ok" doctor.txt
+        shell: bash
+
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Build
+        run: uv build
+
+      - name: Check package
+        run: uvx twine check dist/*

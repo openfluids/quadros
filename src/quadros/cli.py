@@ -19,20 +19,43 @@ def default_output_dir_for_case(case_dir: Path) -> Path:
     return case_dir / "quadros"
 
 
+def _has_pymech() -> bool:
+    """Whether Nek5000 field inspection is available.
+
+    pymech is an optional extra (`quadros[nek5000]`). find_spec on the top-level
+    package is not enough: fields.py imports `pymech.neksuite.field`, and a broken
+    or partial install resolves the parent while failing on the submodule.
+    """
+    try:
+        return importlib.util.find_spec("pymech.neksuite.field") is not None
+    except (ImportError, ModuleNotFoundError, ValueError):
+        return False
+
+
 def doctor(_: argparse.Namespace) -> int:
     checks = {
         "pyvista": importlib.util.find_spec("pyvista") is not None,
-        "pymech": _has_pymech(),
         "vtk": importlib.util.find_spec("vtk") is not None,
         "ffmpeg": shutil.which("ffmpeg") is not None,
     }
+    # pymech is the `nek5000` extra, not a requirement. Reported so the state is
+    # visible, but deliberately excluded from the exit status: an install without
+    # it renders every VTK-readable format perfectly well, and failing here would
+    # tell a non-Nek user their setup is broken when it is not.
+    optional = {"pymech (nek5000 extra)": _has_pymech()}
+
     for name, ok in checks.items():
         print(f"{name}: {'ok' if ok else 'missing'}")
 
     # Offscreen rendering smoke: catches broken VTK/OSMesa setups that
     # importlib.find_spec cannot see (e.g. no display + no software rasteriser).
+    # _offscreen_render_smoke prints its own line, including the failure reason.
     if checks["pyvista"] and checks["vtk"]:
         checks["offscreen_render"] = _offscreen_render_smoke()
+
+    for name, ok in optional.items():
+        print(f"{name}: {'ok' if ok else 'not installed (Nek5000 inspection unavailable)'}")
+
     return 0 if all(checks.values()) else 1
 
 

@@ -48,4 +48,17 @@ dev = [
   "pytest>=8",
   "build>=1.2",
   "twine>=5",
+  "ruff>=0.8",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+# The two _legacy_* modules are vendored scripts kept for reference, not
+# maintained source. Linting them produces noise nobody will act on.
+extend-exclude = ["src/quadros/_legacy_*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]

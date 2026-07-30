@@ -44,8 +44,9 @@ def test_available_field_codes_decodes_temperature_and_scalars(monkeypatch) -> N
 def test_assert_expected_fields_omr_alias_satisfied(tmp_path, monkeypatch) -> None:
     """omR_x mapped to temperature should pass when header says T is present."""
     import sys
-    from quadros import fields
     from pathlib import Path
+
+    from quadros import fields
 
     cfg = tmp_path / "render.json"
     cfg.write_text(json.dumps({"field_aliases": {"omR_x": "temperature"}}))
@@ -76,10 +77,12 @@ def test_assert_expected_fields_omr_alias_satisfied(tmp_path, monkeypatch) -> No
 
 def test_assert_expected_fields_omr_alias_missing(tmp_path, monkeypatch) -> None:
     """omR_x mapped to temperature should error when the header lacks T."""
-    import pytest
     import sys
-    from quadros import fields
     from pathlib import Path
+
+    import pytest
+
+    from quadros import fields
 
     cfg = tmp_path / "render.json"
     cfg.write_text(json.dumps({"field_aliases": {"omR_x": "temperature"}}))
@@ -201,9 +204,10 @@ def test_assert_expected_fields_no_omega_keys_is_noop(tmp_path, monkeypatch) -> 
 
 def test_is_nek_format_recognizes_nek_files() -> None:
     """_is_nek_format should return True for .f0NNNN files."""
-    from quadros import fields
     from pathlib import Path
-    
+
+    from quadros import fields
+
     assert fields._is_nek_format(Path("case.f00001"))
     assert fields._is_nek_format(Path("/path/to/case/snapshot.f00002"))
     assert not fields._is_nek_format(Path("case.vtu"))
@@ -212,8 +216,9 @@ def test_is_nek_format_recognizes_nek_files() -> None:
 
 def test_available_field_codes_nek_dispatch(monkeypatch) -> None:
     """available_field_codes should dispatch to Nek reader for .f0NNNN files."""
-    from quadros import fields
     from pathlib import Path
+
+    from quadros import fields
 
     class _FakeHeader:
         variables = "XUP"
@@ -226,8 +231,9 @@ def test_available_field_codes_nek_dispatch(monkeypatch) -> None:
 
 def test_available_field_codes_degradation_on_missing_pymech(monkeypatch) -> None:
     """available_field_codes should return empty dict if pymech is missing for Nek files."""
-    from quadros import fields
     from pathlib import Path
+
+    from quadros import fields
 
     def _raise_import(_p):
         raise ImportError("No module named 'pymech'")
@@ -239,8 +245,9 @@ def test_available_field_codes_degradation_on_missing_pymech(monkeypatch) -> Non
 
 def test_available_field_codes_vtk_fallback(monkeypatch) -> None:
     """available_field_codes should use pyvista for non-Nek formats."""
-    from quadros import fields
     from pathlib import Path
+
+    from quadros import fields
 
     monkeypatch.setattr(fields, "_available_field_codes_vtk", lambda _p: {"points": 1000, "velocity": 1})
     out = fields.available_field_codes(Path("sphere0.vtu"))
@@ -249,8 +256,9 @@ def test_available_field_codes_vtk_fallback(monkeypatch) -> None:
 
 def test_assert_expected_fields_skips_non_nek_formats(tmp_path, monkeypatch) -> None:
     """assert_expected_fields should skip check for non-Nek formats since omega-R is Nek-specific."""
-    from quadros import fields
     import json
+
+    from quadros import fields
 
     cfg = tmp_path / "render.json"
     cfg.write_text(json.dumps({"field_aliases": {"omR_x": "temperature"}}))
@@ -266,3 +274,37 @@ def test_assert_expected_fields_skips_non_nek_formats(tmp_path, monkeypatch) -> 
     # Should NOT raise, should NOT call the Nek reader
     fields.assert_expected_fields(Path("sphere0.vtu"), cfg)
     assert called["count"] == 0
+
+
+def test_doctor_runs_and_reports_every_check(capsys) -> None:
+    """`quadros doctor` must actually run.
+
+    It shipped once calling a `_has_pymech()` that was never defined, so the
+    command died with NameError on every invocation. Nothing caught it: no test
+    exercised doctor at all. This one calls it for real.
+    """
+    import argparse
+
+    from quadros.cli import doctor
+
+    rc = doctor(argparse.Namespace())
+    out = capsys.readouterr().out
+    # pymech is optional, so its absence must not make doctor report failure.
+    assert rc == 0
+    for check in ("pyvista", "vtk", "ffmpeg", "pymech"):
+        assert check in out, f"doctor did not report {check}"
+
+
+def test_has_pymech_reports_false_when_absent(monkeypatch) -> None:
+    """The probe must answer False rather than raise when pymech is missing."""
+    import importlib.util
+
+    from quadros import cli
+
+    def _missing(name, *a, **k):
+        if name.startswith("pymech"):
+            raise ModuleNotFoundError(name)
+        return importlib.util.find_spec(name, *a, **k)
+
+    monkeypatch.setattr(cli.importlib.util, "find_spec", _missing)
+    assert cli._has_pymech() is False

@@ -3,15 +3,15 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "neksnap"
+name = "quadros"
 version = "0.1.0"
-description = "Reusable Nek5000 snapshot, frame, and video renderer for PyVista-based dense-flow visualization"
+description = "Snapshot, frame, and video renderer for PyVista-based dense-flow visualization with Nek5000 support"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Ricardo A S Frantz" }]
-keywords = ["nek5000", "pyvista", "visualization", "cfd", "slurm", "video"]
+keywords = ["pyvista", "visualization", "cfd", "slurm", "video"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Environment :: Console",
@@ -19,27 +19,29 @@ classifiers = [
   "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Scientific/Engineering :: Visualization",
 ]
 dependencies = [
   "numpy",
   "pillow",
   "pyvista",
-  "pymech",
   "vtk",
 ]
 
+[project.optional-dependencies]
+nek5000 = ["pymech"]
+
 [project.urls]
-Homepage = "https://github.com/ricardofrantz/neksnap"
-Repository = "https://github.com/ricardofrantz/neksnap"
-Issues = "https://github.com/ricardofrantz/neksnap/issues"
+Homepage = "https://github.com/openfluids/quadros"
+Repository = "https://github.com/openfluids/quadros"
+Issues = "https://github.com/openfluids/quadros/issues"
 
 [project.scripts]
-neksnap = "neksnap.cli:main"
+quadros = "quadros.cli:main"
 
 [dependency-groups]
 dev = [

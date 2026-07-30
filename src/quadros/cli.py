@@ -12,17 +12,17 @@ from .render import render_snapshots
 
 
 def default_output_dir_for_snapshot(snapshot: Path) -> Path:
-    return snapshot.parent / "neksnap"
+    return snapshot.parent / "quadros"
 
 
 def default_output_dir_for_case(case_dir: Path) -> Path:
-    return case_dir / "neksnap"
+    return case_dir / "quadros"
 
 
 def doctor(_: argparse.Namespace) -> int:
     checks = {
         "pyvista": importlib.util.find_spec("pyvista") is not None,
-        "pymech": importlib.util.find_spec("pymech") is not None,
+        "pymech": _has_pymech(),
         "vtk": importlib.util.find_spec("vtk") is not None,
         "ffmpeg": shutil.which("ffmpeg") is not None,
     }
@@ -89,7 +89,7 @@ def cmd_extract_camera(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="neksnap")
+    parser = argparse.ArgumentParser(prog="quadros")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("doctor", help="check local rendering dependencies")
@@ -98,7 +98,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("render", help="render one Nek snapshot")
     p.add_argument("snapshot", type=Path)
     p.add_argument("--config", type=Path)
-    p.add_argument("--out", type=Path, help="output root; defaults to SNAPSHOT_PARENT/neksnap")
+    p.add_argument("--out", type=Path, help="output root; defaults to SNAPSHOT_PARENT/quadros")
     p.add_argument("--check", action="store_true", help="preflight configured field aliases before rendering")
     p.set_defaults(func=cmd_render)
 
@@ -106,7 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--case-dir", type=Path, required=True)
     p.add_argument("--pattern", required=True)
     p.add_argument("--config", type=Path)
-    p.add_argument("--out", type=Path, help="output root; defaults to CASE_DIR/neksnap")
+    p.add_argument("--out", type=Path, help="output root; defaults to CASE_DIR/quadros")
     p.add_argument("--check", action="store_true", help="preflight configured field aliases before rendering")
     p.set_defaults(func=cmd_render_many)
 

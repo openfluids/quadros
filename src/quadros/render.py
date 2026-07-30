@@ -11,7 +11,7 @@ per-snapshot output contract under the run directory:
 
 This module just routes snapshot paths into the legacy entry point and adds a
 top-level ``manifest_index.json`` that enumerates the per-snapshot manifests
-produced by the run so downstream tools (``neksnap inspect``, the cockpit
+produced by the run so downstream tools (``quadros inspect``, the cockpit
 sync step, beads) can iterate without re-globbing.
 """
 from __future__ import annotations

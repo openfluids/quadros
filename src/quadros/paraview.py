@@ -9,7 +9,7 @@ def extract_camera(state: Path, out: Path) -> int:
 
     old_argv = sys.argv[:]
     try:
-        sys.argv = ["neksnap extract-camera", str(state), "--camera-json", str(out)]
+        sys.argv = ["quadros extract-camera", str(state), "--camera-json", str(out)]
         return legacy.main()
     finally:
         sys.argv = old_argv

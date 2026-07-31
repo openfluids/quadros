@@ -11,3 +11,7 @@ logs/
 manifests/
 events/
 movies/
+
+# coverage
+.coverage
+htmlcov/

@@ -349,3 +349,214 @@ def test_has_pymech_reports_false_when_absent(monkeypatch) -> None:
 
     monkeypatch.setattr(cli.importlib.util, "find_spec", _missing)
     assert cli._has_pymech() is False
+
+
+# --- encode.py: ffmpeg resolution and command construction -------------------
+
+
+def test_encode_frames_builds_a_glob_pattern_command(tmp_path, monkeypatch) -> None:
+    """The frame glob must reach ffmpeg as a pattern, not a pre-expanded list.
+
+    -pattern_type glob with a single -i is what lets a run of thousands of PNGs
+    be encoded without building an argv longer than the OS allows.
+    """
+    from quadros import encode
+
+    frames = tmp_path / "frames"
+    frames.mkdir()
+    out = tmp_path / "deeper" / "movie.mp4"
+    seen = {}
+
+    monkeypatch.setattr(encode, "_resolve_ffmpeg", lambda: "/bin/ffmpeg")
+    monkeypatch.setattr(encode.subprocess, "run", lambda cmd, **kw: seen.update(cmd=cmd, kw=kw))
+
+    encode.encode_frames(frames, out, fps=30)
+
+    cmd = seen["cmd"]
+    assert cmd[0] == "/bin/ffmpeg"
+    assert "-framerate" in cmd and cmd[cmd.index("-framerate") + 1] == "30"
+    assert cmd[cmd.index("-pattern_type") + 1] == "glob"
+    assert cmd[cmd.index("-i") + 1] == str(frames / "*.png")
+    # yuv420p is what makes the result playable outside ffmpeg itself
+    assert cmd[cmd.index("-pix_fmt") + 1] == "yuv420p"
+    assert cmd[-1] == str(out)
+    assert seen["kw"]["check"] is True
+    # the output directory must be created, or ffmpeg fails at the last step
+    assert out.parent.is_dir()
+
+
+def test_encode_frames_honours_a_custom_glob(tmp_path, monkeypatch) -> None:
+    from quadros import encode
+
+    frames = tmp_path / "frames"
+    frames.mkdir()
+    seen = {}
+    monkeypatch.setattr(encode, "_resolve_ffmpeg", lambda: "/bin/ffmpeg")
+    monkeypatch.setattr(encode.subprocess, "run", lambda cmd, **kw: seen.update(cmd=cmd))
+
+    encode.encode_frames(frames, tmp_path / "m.mp4", glob="view1_*.png")
+    assert seen["cmd"][seen["cmd"].index("-i") + 1] == str(frames / "view1_*.png")
+
+
+def test_resolve_ffmpeg_prefers_the_bundled_binary(monkeypatch) -> None:
+    """imageio_ffmpeg ships a static binary inside the venv, so it is
+    PATH-independent and must win over whatever happens to be installed."""
+    import sys
+    import types
+
+    from quadros import encode
+
+    fake = types.ModuleType("imageio_ffmpeg")
+    fake.get_ffmpeg_exe = lambda: "/venv/bundled/ffmpeg"
+    monkeypatch.setitem(sys.modules, "imageio_ffmpeg", fake)
+    monkeypatch.setattr(encode.shutil, "which", lambda _n: "/usr/bin/ffmpeg")
+
+    assert encode._resolve_ffmpeg() == "/venv/bundled/ffmpeg"
+
+
+def test_resolve_ffmpeg_falls_back_to_path(monkeypatch) -> None:
+    import builtins
+    import sys
+
+    from quadros import encode
+
+    monkeypatch.setitem(sys.modules, "imageio_ffmpeg", None)
+    real_import = builtins.__import__
+
+    def no_imageio(name, *a, **k):
+        if name == "imageio_ffmpeg":
+            raise ImportError("not installed")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", no_imageio)
+    monkeypatch.setattr(encode.shutil, "which", lambda _n: "/usr/bin/ffmpeg")
+    assert encode._resolve_ffmpeg() == "/usr/bin/ffmpeg"
+
+
+def test_resolve_ffmpeg_raises_a_actionable_error_when_nothing_is_available(monkeypatch) -> None:
+    import builtins
+
+    import pytest
+
+    from quadros import encode
+
+    real_import = builtins.__import__
+
+    def no_imageio(name, *a, **k):
+        if name == "imageio_ffmpeg":
+            raise ImportError("not installed")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", no_imageio)
+    monkeypatch.setattr(encode.shutil, "which", lambda _n: None)
+    with pytest.raises(RuntimeError, match="imageio-ffmpeg"):
+        encode._resolve_ffmpeg()
+
+
+# --- render.py: the paths a failed run actually takes ------------------------
+
+
+def test_render_snapshots_refuses_an_empty_snapshot_list(tmp_path) -> None:
+    """An empty glob is a user error worth naming, not a silent no-op run."""
+    import pytest
+
+    from quadros import render
+
+    with pytest.raises(ValueError, match="no snapshots matched"):
+        render.render_snapshots([], None, tmp_path / "out")
+
+
+def test_summarise_manifest_reports_a_corrupt_manifest_instead_of_raising(tmp_path) -> None:
+    """One truncated manifest must not abort the index for a whole run."""
+    from quadros import render
+
+    bad = tmp_path / "case0_render_manifest.json"
+    bad.write_text("{not json")
+    summary = render._summarise_manifest(bad)
+    assert summary["manifest"] == str(bad)
+    assert "JSONDecodeError" in summary["error"]
+
+
+def test_render_snapshots_indexes_a_corrupt_manifest_without_dying(tmp_path, monkeypatch) -> None:
+    import sys
+
+    from quadros import render
+
+    snap = tmp_path / "case0.f00001"
+    snap.write_bytes(b"")
+    out = tmp_path / "out"
+
+    def fake_main(_args):
+        (out / "case0.f00001_render_manifest.json").write_text("{truncated")
+        return 0
+
+    class _FakeLegacy:
+        main = staticmethod(fake_main)
+
+    sys.modules["quadros._legacy_render_nek_isosurface_views"] = _FakeLegacy
+    rc = render.render_snapshots([snap], None, out)
+
+    assert rc == 0
+    data = json.loads((out / "manifest_index.json").read_text())
+    assert data["manifest_count"] == 1
+    assert "error" in data["manifests"][0]
+
+
+def test_render_snapshots_exports_the_config_to_the_legacy_renderer(tmp_path, monkeypatch) -> None:
+    """The legacy renderer reads its config from the environment, not an argument."""
+    import os
+    import sys
+
+    from quadros import render
+
+    snap = tmp_path / "case0.f00001"
+    snap.write_bytes(b"")
+    cfg = tmp_path / "render.json"
+    cfg.write_text("{}")
+    out = tmp_path / "out"
+    seen = {}
+
+    def fake_main(_args):
+        seen["config"] = os.environ.get("NEK_RENDER_CONFIG")
+        seen["figdir"] = os.environ.get("PYVISTA_FIGURE_DIR")
+        seen["offscreen"] = os.environ.get("PYVISTA_OFF_SCREEN")
+        return 0
+
+    class _FakeLegacy:
+        main = staticmethod(fake_main)
+
+    sys.modules["quadros._legacy_render_nek_isosurface_views"] = _FakeLegacy
+    render.render_snapshots([snap], cfg, out)
+
+    assert seen["config"] == str(cfg)
+    assert seen["figdir"] == str(out)
+    assert seen["offscreen"] == "true"
+
+
+def test_render_snapshots_check_gate_runs_before_the_renderer(tmp_path, monkeypatch) -> None:
+    """--check must fail on a missing field before spending a long render."""
+    import sys
+
+    import pytest
+
+    from quadros import fields, render
+
+    snap = tmp_path / "case0.f00001"
+    snap.write_bytes(b"")
+    called = {"render": False}
+
+    def boom(_snapshot, _config):
+        raise RuntimeError("ifvox missing")
+
+    class _FakeLegacy:
+        @staticmethod
+        def main(_args):
+            called["render"] = True
+            return 0
+
+    monkeypatch.setattr(fields, "assert_expected_fields", boom)
+    sys.modules["quadros._legacy_render_nek_isosurface_views"] = _FakeLegacy
+
+    with pytest.raises(RuntimeError, match="ifvox missing"):
+        render.render_snapshots([snap], None, tmp_path / "out", check=True)
+    assert called["render"] is False, "renderer ran despite the preflight check failing"

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "quadros"
-version = "0.1.1"
+version = "0.1.2"
 description = "Snapshot, frame, and video renderer for PyVista-based dense-flow visualization with Nek5000 support"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -49,6 +49,22 @@ dev = [
   "build>=1.2",
   "twine>=5",
   "ruff>=0.8",
+]
+
+# An allow-list, not an exclude-list. hatchling's default is to ship everything
+# git does not ignore, which put six ParaView state files (~5.5 MB) into the
+# 0.1.1 sdist. The repo root collects stray files over time, so an exclude-list
+# would silently ship each new one; naming what belongs cannot drift that way.
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/quadros",
+  "tests",
+  "docs",
+  "configs",
+  "slurm",
+  "README.md",
+  "LICENSE",
+  "pyproject.toml",
 ]
 
 [tool.ruff]

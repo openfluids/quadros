@@ -78,3 +78,6 @@ extend-exclude = ["src/quadros/_legacy_*.py"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 ignore = ["E501"]
+
+[tool.uv]
+exclude-newer = "7 days"

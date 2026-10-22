@@ -1,0 +1,41 @@
+{
+  "camera_views": {
+    "qp_comp": {
+      "pyvista_camera_position": [
+        [40.96875746230749, 16.597738683532768, 99.32333165315941],
+        [24.740115970373154, 4.398751735687257, 0.0],
+        [-0.04951323271971583, 0.9922712225228191, -0.113781636210389]
+      ],
+      "parallel_projection": true,
+      "parallel_scale": 21.684556916679487,
+      "view_angle": 30.0
+    }
+  },
+  "scenes": [
+    {
+      "name": "qp_comp_smoke",
+      "iso_specs": [],
+      "iso_colors": {
+        "temperature": "#C8C8C8",
+        "temp": "#C8C8C8"
+      },
+      "iso_opacities": {
+        "temperature": 0.5,
+        "temp": 0.5
+      },
+      "compositions": [
+        {
+          "name": "paraview_temperature",
+          "iso_specs": ["temperature=0.52"],
+          "views": ["qp_comp"],
+          "resolutions": ["fullhd"]
+        }
+      ],
+      "roi": "none",
+      "views": ["qp_comp"],
+      "resolutions": ["fullhd"],
+      "camera_zoom": 1.0,
+      "show_bounds": false
+    }
+  ]
+}

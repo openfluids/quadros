@@ -1,0 +1,101 @@
+{
+  "camera_views": {
+    "qp_comp": {
+      "pyvista_camera_position": [
+        [40.96875746230749, 16.597738683532768, 99.32333165315941],
+        [24.740115970373154, 4.398751735687257, 0.0],
+        [-0.04951323271971583, 0.9922712225228191, -0.113781636210389]
+      ],
+      "position": [40.96875746230749, 16.597738683532768, 99.32333165315941],
+      "focal_point": [24.740115970373154, 4.398751735687257, 0.0],
+      "view_up": [-0.04951323271971583, 0.9922712225228191, -0.113781636210389],
+      "parallel_projection": true,
+      "parallel_scale": 21.684556916679487,
+      "view_angle": 30.0
+    }
+  },
+  "scenes": [
+    {
+      "name": "u_zero",
+      "iso_specs": ["u=0"],
+      "iso_colors": {
+        "u": "#C8C8C8"
+      },
+      "iso_opacities": {
+        "u": 0.62
+      },
+      "roi": "none",
+      "surface_smooth_method": "taubin",
+      "surface_smooth_iterations": 20,
+      "surface_taubin_pass_band": 0.08,
+      "surface_smooth_boundary": true,
+      "surface_smooth_feature": false,
+      "views": ["top", "side", "front", "iso", "side_iso_left", "side_iso_right", "qp_comp"],
+      "resolutions": ["fullhd", "2k", "4k"],
+      "camera_zoom": 1.08,
+      "show_bounds": false
+    },
+    {
+      "name": "u_high",
+      "iso_specs": ["u=0.95"],
+      "iso_colors": {
+        "u": "#FF7F0E"
+      },
+      "iso_opacities": {
+        "u": 0.62
+      },
+      "roi": "none",
+      "surface_smooth_method": "taubin",
+      "surface_smooth_iterations": 20,
+      "surface_taubin_pass_band": 0.08,
+      "surface_smooth_boundary": true,
+      "surface_smooth_feature": false,
+      "views": ["top", "side", "front", "iso", "side_iso_left", "side_iso_right", "qp_comp"],
+      "resolutions": ["fullhd", "2k", "4k"],
+      "camera_zoom": 1.08,
+      "show_bounds": false
+    },
+    {
+      "name": "v_pm_0p01",
+      "iso_specs": ["v=-0.01", "v=0.01"],
+      "iso_colors": {
+        "v-": "#D62728",
+        "v+": "#2CA02C"
+      },
+      "iso_opacities": {
+        "v": 0.54
+      },
+      "roi": "none",
+      "surface_smooth_method": "taubin",
+      "surface_smooth_iterations": 20,
+      "surface_taubin_pass_band": 0.08,
+      "surface_smooth_boundary": true,
+      "surface_smooth_feature": false,
+      "views": ["top", "side", "front", "iso", "side_iso_left", "side_iso_right", "qp_comp"],
+      "resolutions": ["fullhd", "2k", "4k"],
+      "camera_zoom": 1.08,
+      "show_bounds": false
+    },
+    {
+      "name": "w_pm_0p01",
+      "iso_specs": ["w=-0.01", "w=0.01"],
+      "iso_colors": {
+        "w-": "#7B61FF",
+        "w+": "#17BECF"
+      },
+      "iso_opacities": {
+        "w": 0.54
+      },
+      "roi": "none",
+      "surface_smooth_method": "taubin",
+      "surface_smooth_iterations": 20,
+      "surface_taubin_pass_band": 0.08,
+      "surface_smooth_boundary": true,
+      "surface_smooth_feature": false,
+      "views": ["top", "side", "front", "iso", "side_iso_left", "side_iso_right", "qp_comp"],
+      "resolutions": ["fullhd", "2k", "4k"],
+      "camera_zoom": 1.08,
+      "show_bounds": false
+    }
+  ]
+}

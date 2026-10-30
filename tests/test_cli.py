@@ -140,9 +140,12 @@ def test_render_snapshots_writes_manifest_index(tmp_path, monkeypatch) -> None:
     class _FakeLegacy:
         main = staticmethod(fake_legacy_main)
 
-    monkeypatch.setattr(render, "_legacy_render_nek_isosurface_views", _FakeLegacy, raising=False)
-    import sys as _sys
-    _sys.modules["quadros._legacy_render_nek_isosurface_views"] = _FakeLegacy
+    import sys
+
+    import quadros
+
+    monkeypatch.setitem(sys.modules, "quadros._legacy_render_nek_isosurface_views", _FakeLegacy)
+    monkeypatch.setattr(quadros, "_legacy_render_nek_isosurface_views", _FakeLegacy, raising=False)
 
     rc = render.render_snapshots(snapshots, None, out)
     assert rc == 0
@@ -493,7 +496,10 @@ def test_render_snapshots_indexes_a_corrupt_manifest_without_dying(tmp_path, mon
     class _FakeLegacy:
         main = staticmethod(fake_main)
 
-    sys.modules["quadros._legacy_render_nek_isosurface_views"] = _FakeLegacy
+    import quadros
+
+    monkeypatch.setitem(sys.modules, "quadros._legacy_render_nek_isosurface_views", _FakeLegacy)
+    monkeypatch.setattr(quadros, "_legacy_render_nek_isosurface_views", _FakeLegacy, raising=False)
     rc = render.render_snapshots([snap], None, out)
 
     assert rc == 0
@@ -525,7 +531,10 @@ def test_render_snapshots_exports_the_config_to_the_legacy_renderer(tmp_path, mo
     class _FakeLegacy:
         main = staticmethod(fake_main)
 
-    sys.modules["quadros._legacy_render_nek_isosurface_views"] = _FakeLegacy
+    import quadros
+
+    monkeypatch.setitem(sys.modules, "quadros._legacy_render_nek_isosurface_views", _FakeLegacy)
+    monkeypatch.setattr(quadros, "_legacy_render_nek_isosurface_views", _FakeLegacy, raising=False)
     render.render_snapshots([snap], cfg, out)
 
     assert seen["config"] == str(cfg)
@@ -554,8 +563,11 @@ def test_render_snapshots_check_gate_runs_before_the_renderer(tmp_path, monkeypa
             called["render"] = True
             return 0
 
+    import quadros
+
     monkeypatch.setattr(fields, "assert_expected_fields", boom)
-    sys.modules["quadros._legacy_render_nek_isosurface_views"] = _FakeLegacy
+    monkeypatch.setitem(sys.modules, "quadros._legacy_render_nek_isosurface_views", _FakeLegacy)
+    monkeypatch.setattr(quadros, "_legacy_render_nek_isosurface_views", _FakeLegacy, raising=False)
 
     with pytest.raises(RuntimeError, match="ifvox missing"):
         render.render_snapshots([snap], None, tmp_path / "out", check=True)

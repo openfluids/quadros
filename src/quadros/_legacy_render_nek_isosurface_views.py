@@ -7,6 +7,7 @@ import re
 import sys
 import time
 import traceback
+import weakref
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from contextlib import contextmanager
@@ -17,8 +18,8 @@ from pathlib import Path
 os.environ.setdefault("PYVISTA_OFF_SCREEN", "true")
 
 import numpy as np
+from numpy.polynomial import legendre
 from PIL import Image
-from pymech.neksuite import readnek
 import pyvista as pv
 import vtk
 
@@ -240,7 +241,20 @@ FIELD_STYLE_ALIASES = {
 
 DERIVED_FIELD_REQUIREMENTS = {
     "speed": ("u", "v", "w"),
+    "omx": ("u", "v", "w"),
+    "omy": ("u", "v", "w"),
+    "omz": ("u", "v", "w"),
+    "q": ("u", "v", "w"),
+    "lambda2": ("u", "v", "w"),
 }
+
+# Jeong and Hussain order the eigenvalues lambda1 >= lambda2 >= lambda3.
+# lambda2 is the middle eigenvalue of S^2 + Omega^2.
+VORTEX_FIELDS = frozenset({"omx", "omy", "omz", "q", "lambda2"})
+_DIFF_MATRIX: dict[int, np.ndarray] = {}
+# One gradient serves every derived field on the same element.
+# The stored gradient stays valid while pos and vel stay unchanged.
+_VELOCITY_GRADIENTS: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 
 
 @dataclass(frozen=True)
@@ -1028,6 +1042,152 @@ def make_render_case(path: Path) -> RenderCase:
     )
 
 
+def gll_nodes(n: int) -> np.ndarray:
+    """Return n Gauss-Lobatto-Legendre nodes on [-1, 1].
+
+    Nek5000 places n nodes on one element edge.
+    The polynomial order is n - 1.
+    Interior nodes are the roots of the derivative of P_{n-1}.
+    """
+    if n < 2:
+        raise ValueError(f"GLL nodes need at least 2 points. The axis has {n}.")
+    coeff = np.zeros(n)
+    coeff[-1] = 1.0
+    interior = np.atleast_1d(np.asarray(legendre.legroots(legendre.legder(coeff))))
+    if np.iscomplexobj(interior):
+        imag = float(np.max(np.abs(interior.imag))) if interior.size else 0.0
+        if imag > 1e-8:
+            raise ValueError(
+                f"Legendre derivative roots are complex. The largest imaginary part is {imag:.3e}."
+            )
+        interior = np.real(interior)
+    nodes = np.concatenate(([-1.0], np.sort(interior), [1.0]))
+    if nodes.size != n or np.any(np.diff(nodes) <= 0.0):
+        raise ValueError(f"GLL nodes for {n} points are not strictly increasing.")
+    return nodes
+
+
+def gll_differentiation_matrix(n: int) -> np.ndarray:
+    """Return the derivative matrix on Gauss-Lobatto-Legendre nodes.
+
+    D[i, j] is the derivative at node i of the basis polynomial at node j.
+    Off-diagonal entries use P_{n-1} at the nodes.
+    A constant row sums to zero, so the diagonal closes the row.
+    """
+    cached = _DIFF_MATRIX.get(n)
+    if cached is not None:
+        return cached
+    nodes = gll_nodes(n)
+    coeff = np.zeros(n)
+    coeff[-1] = 1.0
+    pn = legendre.legval(nodes, coeff)
+    gap = nodes[:, None] - nodes[None, :]
+    np.fill_diagonal(gap, 1.0)
+    matrix = pn[:, None] / (pn[None, :] * gap)
+    np.fill_diagonal(matrix, 0.0)
+    index = np.arange(n)
+    matrix[index, index] = -np.sum(matrix, axis=1)
+    _DIFF_MATRIX[n] = matrix
+    return matrix
+
+
+def _differentiate(values: np.ndarray, matrix: np.ndarray, axis: int) -> np.ndarray:
+    moved = np.moveaxis(values, axis, -1)
+    derived = moved @ matrix.T
+    return np.moveaxis(derived, -1, axis)
+
+
+def _reference_derivatives(
+    component: np.ndarray,
+    matrices: tuple[np.ndarray, np.ndarray, np.ndarray],
+) -> np.ndarray:
+    """Return d/dr, d/ds, d/dt of one scalar.
+
+    The last axis of ``component`` is r.
+    The middle axis is s.
+    The first axis is t.
+    """
+    dr = _differentiate(component, matrices[0], -1)
+    ds = _differentiate(component, matrices[1], -2)
+    dt = _differentiate(component, matrices[2], -3)
+    return np.stack((dr, ds, dt), axis=0)
+
+
+def velocity_gradient(elem) -> np.ndarray:
+    """Return the velocity gradient at the nodes of one element.
+
+    The result has shape (lz, ly, lx, 3, 3).
+    Index [..., i, j] is the derivative of component i along coordinate j.
+    Component 0 is u.
+    Coordinate 0 is x.
+    Each element differentiates its own velocity.
+    The derivative can jump across a face that two elements share.
+    """
+    cached = _VELOCITY_GRADIENTS.get(elem)
+    if cached is not None:
+        return cached
+    gradient = _velocity_gradient(elem)
+    _VELOCITY_GRADIENTS[elem] = gradient
+    return gradient
+
+
+def _velocity_gradient(elem) -> np.ndarray:
+    pos = np.asarray(elem.pos, dtype=np.float64)
+    vel = np.asarray(elem.vel, dtype=np.float64)
+    if pos.ndim != 4 or pos.shape[0] != 3:
+        raise ValueError("Position needs shape (3, lz, ly, lx).")
+    if vel.shape[0] < 3:
+        raise ValueError(f"The velocity array needs 3 components. This element has {vel.shape[0]}.")
+    if vel.shape[1:] != pos.shape[1:]:
+        raise ValueError("Position and velocity use different node counts on this element.")
+    lz, ly, lx = pos.shape[1:]
+    for count in (lx, ly, lz):
+        if count < 2:
+            raise ValueError(f"GLL nodes need at least 2 points. The axis has {count}.")
+    matrices = (
+        gll_differentiation_matrix(lx),
+        gll_differentiation_matrix(ly),
+        gll_differentiation_matrix(lz),
+    )
+    jac = np.stack([_reference_derivatives(pos[axis], matrices) for axis in range(3)], axis=0)
+    jac = np.moveaxis(jac, (0, 1), (-2, -1))
+    inv_jac = np.linalg.inv(jac)
+    reference = np.stack([_reference_derivatives(vel[axis], matrices) for axis in range(3)], axis=0)
+    reference = np.moveaxis(reference, (0, 1), (-2, -1))
+    return reference @ inv_jac
+
+
+def vortex_scalar(elem, field_name: str) -> np.ndarray:
+    """Return one vortex scalar on an element.
+
+    omx, omy and omz are the vorticity components.
+    q equals 0.5*(||Omega||^2 - ||S||^2), with Frobenius norms.
+    S is the symmetric part of the velocity gradient.
+    Omega is the antisymmetric part.
+    lambda2 is the middle eigenvalue of S^2 + Omega^2.
+    Eigenvalues follow lambda1 >= lambda2 >= lambda3.
+    A vortex is a region where lambda2 is negative.
+    """
+    gradient = velocity_gradient(elem)
+    if field_name == "omx":
+        return gradient[..., 2, 1] - gradient[..., 1, 2]
+    if field_name == "omy":
+        return gradient[..., 0, 2] - gradient[..., 2, 0]
+    if field_name == "omz":
+        return gradient[..., 1, 0] - gradient[..., 0, 1]
+    strain = 0.5 * (gradient + np.swapaxes(gradient, -1, -2))
+    rotation = 0.5 * (gradient - np.swapaxes(gradient, -1, -2))
+    if field_name == "q":
+        rotation_norm = np.sum(rotation * rotation, axis=(-2, -1))
+        strain_norm = np.sum(strain * strain, axis=(-2, -1))
+        return 0.5 * (rotation_norm - strain_norm)
+    if field_name == "lambda2":
+        moment = strain @ strain + rotation @ rotation
+        eigenvalues = np.linalg.eigvalsh(moment)
+        return eigenvalues[..., 1]
+    raise ValueError(f"unsupported vortex field {field_name!r}")
+
+
 def scalar_values(elem, field_name: str):
     field_name = canonical_field_name(field_name)
     if field_name == "temp0":
@@ -1048,6 +1208,8 @@ def scalar_values(elem, field_name: str):
         return elem.scal[int(field_name[1:])]
     if field_name in {"speed", "velocity_magnitude", "mag"}:
         return np.sqrt(elem.vel[0] ** 2 + elem.vel[1] ** 2 + elem.vel[2] ** 2)
+    if field_name in VORTEX_FIELDS:
+        return vortex_scalar(elem, field_name)
     raise ValueError(f"unsupported field {field_name!r}")
 
 
@@ -1688,6 +1850,8 @@ def render_case(case: RenderCase, scenes: tuple[SceneSpec, ...]) -> None:
         clean_snapshot_outputs(case)
 
         with log().timed("read_nek", source_file=str(case.field_path), bytes=source_stat.st_size):
+            from pymech.neksuite import readnek
+
             field = readnek(case.field_path)
         available_fields = available_field_names(field)
         renderable_fields = renderable_field_names(available_fields)
